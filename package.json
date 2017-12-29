@@ -1,0 +1,35 @@
+{
+  "name": "electron-serialport",
+  "version": "1.0.1",
+  "description": "A minimal Electron application with node serialport",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "install": "electron-rebuild"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:arjo1203/Temp-Capturer.git"
+  },
+  "keywords": [
+    "Electron",
+    "quick",
+    "start",
+    "tutorial",
+    "demo"
+  ],
+  "author": "Jose Araujo",
+  "license": "LicenseRef-LICENSE",
+  "devDependencies": {
+    "electron": "^1.4.1",
+    "electron-rebuild": "^1.4.0"
+  },
+  "dependencies": {
+    "angular": "^1.6.8",
+    "angular-ui-router": "^1.0.3",
+    "bootstrap": "^3.3.7",
+    "data-table": "^2.0.0",
+    "promise": "^8.0.1",
+    "serialport": "^4.0.7"
+  }
+}
