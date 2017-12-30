@@ -1,25 +1,20 @@
 var fs = require('file-system');
 var csvWriter = require('csv-write-stream')
-var writer = csvWriter()
 var sprintf = require("sprintf-js").sprintf
 
 var writer = csvWriter({ headers: ["TempSensor0", "TempSensor1"] })
 writer.pipe(fs.createWriteStream('out.csv'))
-// writer.write(['world', 'bar'])
-// writer.write(['stuff', 'shit'])
-// writer.end()
 
 TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect', function ($scope, $window, $timeout, autoDetect) {
-    console.log('connected right');
+    console.log('AppCtrl started');
 
     $scope.sample = 0;
     $scope.sampleSize = 10;
     $scope.port = null;
 
-    $scope.NumOfTempSensors = 2;
+    $scope.NumOfTempSensors = 3;
 
-    $scope.onExit = function () {
-        console.log('closed');
+    $scope.onExit = function () {   //
         writer.end()
         return;
     };
@@ -46,34 +41,41 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
         });
         $scope.port.on('data', function (data) {
             // console.log('Data:', data);
-            var parsedData = data.replace(/(\r\n|\n|\r)/gm, "").split(',');
+            var parsedData = data.replace(/(\r\n|\n|\r)/gm, "").split(','); // remove newline character, then split
 
-            for (var i = 0; i < $scope.NumOfTempSensors; i++) {
-                parsedData[i] = parsedData[i] * 5.0 / 1024;     // convert raw adc to mV
-                parsedData[i] = (parsedData[i] - 0.5) * 100;    // convert to celsius
-                parsedData[i] = (parsedData[i] * 9 / 5) + 32;   // convert to fahrenheit
-            }
-
-            $scope.sample++;
-            if ($scope.sample > $scope.sampleSize) {
-                $scope.labels.shift();
+            if (parsedData.length > 1) {
                 for (var i = 0; i < $scope.NumOfTempSensors; i++) {
-                    $scope.data[i].shift();
+                    parsedData[i] = parsedData[i] * 5.0 / 1024;     // convert raw adc to mV
+                    parsedData[i] = (parsedData[i] - 0.5) * 100;    // convert to celsius
+                    parsedData[i] = (parsedData[i] * 9 / 5) + 32;   // convert to fahrenheit
                 }
-            }
-            $scope.labels.push($scope.sample.toString());
-            for (var i = 0; i < $scope.NumOfTempSensors; i++) {
-                $scope.data[i].push(parsedData[i]);
-            }
-            writer.write(parsedData);
 
-            // Simulate async data update
-            $timeout(function () {
-                $scope.updateGraph();
-            }, 50);
+                if ($scope.sample > $scope.sampleSize-1) {  // start shifting chart
+                    $scope.labels.push($scope.sample.toString());
+                    $scope.labels.shift();
+                    for (var i = 0; i < $scope.NumOfTempSensors; i++) {
+                        $scope.data[i].shift();
+                    }
+                }
+                for (var i = 0; i < $scope.NumOfTempSensors; i++) { // pump data into chart
+                    $scope.data[i].push(parsedData[i]);
+                }
+                writer.write(parsedData);
+                $scope.sample++;    // keep track of the current sample
+
+                // Simulate async data update
+                $timeout(function () {
+                    $scope.updateChart();
+                }, 50);
+            }
         });
     };
 
+    $scope.numOfSensors = function () {
+        $scope.port.write('s');
+    };
+
+    // initialize empty chart
     $scope.labels = [];
     $scope.series = [];
     $scope.data = [];
@@ -86,45 +88,44 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
             yAxes: []
         }
     };
-    // setup chart
-    for (var i = 0; i < $scope.NumOfTempSensors; i++) {
+    $scope.datasetOverride = [];
+    // configure chart
+    for (var i = 0; i < $scope.NumOfTempSensors; i++) { // create dataset per temp sensor
         $scope.series.push(sprintf("Temp Sensor %d", i));
         $scope.data.push([]);
-        if(i == 0) {
-            $scope.options.scales.yAxes.push(
-                {
-                    id: sprintf('y-axis-%d', i),
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    ticks: {
-                        max: 120,
-                        min: -40,
-                        stepSize: 10
-                    }
-                }
-            );
+        var yAxesOpts = {
+            id: sprintf('y-axis-%d', i),
+            type: 'linear',
+            position: 'right',
+            ticks: {
+                max: 120,       // max range of TMP36 125 Celsius, 257 Fahrenheit
+                min: -40,       // min range of TMP36 -40 Celsius, -40 Fahrenheit
+                stepSize: 10    // 10 Degress Fahrenheit resolution
+            }
+        };
+        // only show one y-axis
+        if (i == 0) {
+            yAxesOpts.display = true;
         }
         else {
-            $scope.options.scales.yAxes.push(
-                {
-                    id: sprintf('y-axis-%d', i),
-                    type: 'linear',
-                    display: false,
-                    position: 'right',
-                    ticks: {
-                        max: 120,
-                        min: -40,
-                        stepSize: 10
-                    }
-                }
-            );
+            yAxesOpts.display = false;
         }
+        $scope.options.scales.yAxes.push(yAxesOpts);
+        $scope.datasetOverride.push(
+            {
+                backgroundColor: "rgba(0,0,0,0)"    // remove fill from chart colors
+            }
+        );
     }
+    // renders empty chart
+    for(var i = 0; i < $scope.sampleSize; i++) {
+        $scope.labels.push(i.toString());
+    }
+    // console.log($scope.chartColors);
     $scope.onClick = function (points, evt) {
         console.log(points, evt);
     };
-    $scope.updateGraph = function () {
+    $scope.updateChart = function () {
         $scope.data = $scope.data;
     };
 }]);
