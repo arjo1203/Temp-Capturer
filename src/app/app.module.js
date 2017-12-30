@@ -1,7 +1,7 @@
 const SerialPort = require('serialport')
 var Promise = require('promise')
 
-var TempCapturer = angular.module('TempCapturer', ['ui.router']);
+var TempCapturer = angular.module('TempCapturer', ['ui.router', 'chart.js']);
 TempCapturer.config(function ($stateProvider, $urlRouterProvider) {
     $urlRouterProvider.otherwise('/index');
     $stateProvider
@@ -17,7 +17,7 @@ TempCapturer.service('autoDetect', function () {
             SerialPort.list(function (err, ports) {
                 var targetPort = null;
                 ports.forEach(function (port) {
-                    if (port.manufacturer.includes('Arduino LLC'))
+                    if (port.pnpId.includes('BTHENUM'))
                         targetPort = port
                 });
                 if (targetPort != null) {

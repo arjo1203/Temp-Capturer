@@ -26,9 +26,12 @@
   },
   "dependencies": {
     "angular": "^1.6.8",
+    "angular-chart.js": "^1.1.1",
     "angular-ui-router": "^1.0.3",
     "bootstrap": "^3.3.7",
+    "csv-write-stream": "^2.0.0",
     "data-table": "^2.0.0",
+    "file-system": "^2.2.2",
     "promise": "^8.0.1",
     "serialport": "^4.0.7"
   }
