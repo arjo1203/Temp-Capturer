@@ -2,25 +2,15 @@ var fs = require('file-system');
 var csvWriter = require('csv-write-stream')
 var sprintf = require("sprintf-js").sprintf
 
-var writer = csvWriter({ headers: ["TempSensor0", "TempSensor1"] })
-writer.pipe(fs.createWriteStream('out.csv'))
-
 TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect', function ($scope, $window, $timeout, autoDetect) {
     console.log('AppCtrl started');
 
-    $scope.sample = 0;
-    $scope.sampleSize = 10;
-    $scope.port = null;
-
-    $scope.NumOfTempSensors = 3;
-
-    $scope.onExit = function () {   //
-        writer.end()
-        return;
-    };
-    $window.onbeforeunload = $scope.onExit;
+    $scope.sampleCnt = 0;           // sample counter
+    $scope.sampleSize = 10;         // samples size for chart
+    $scope.numOfTempSensors = 3;    // number of temp sensors
 
     autoDetect.then(function (result) {
+        // serial port for temp sample data
         $scope.port = new SerialPort(result.comName, {
             baudRate: 9600,
             autoOpen: false,
@@ -29,39 +19,48 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
         $scope.init();
     });
 
+    // csv writer instantiation
+    $scope.csvHeaders = [];
+    for(var i = 0; i < $scope.numOfTempSensors; i++) {
+        $scope.csvHeaders.push(sprintf("TempSensor%d", i));
+    }
+    $scope.csvWriter = csvWriter({ headers: $scope.csvHeaders});
+    $scope.csvWriter.pipe(fs.createWriteStream('out.csv'));
+    $window.onbeforeunload = function () {
+        $scope.csvWriter.end();   // close csv writer pipe
+        return;
+    };
+
     $scope.init = function () {
         $scope.port.open(function (err) {
             if (err) {
                 return console.log('Error opening port: ', err.message);
             }
-
             console.log('Succesfully opened port!');
-            // Because there's no callback to write, write errors will be emitted on the port:
-            // port.write('main screen turn on');
         });
         $scope.port.on('data', function (data) {
             // console.log('Data:', data);
             var parsedData = data.replace(/(\r\n|\n|\r)/gm, "").split(','); // remove newline character, then split
 
             if (parsedData.length > 1) {
-                for (var i = 0; i < $scope.NumOfTempSensors; i++) {
+                for (var i = 0; i < $scope.numOfTempSensors; i++) {
                     parsedData[i] = parsedData[i] * 5.0 / 1024;     // convert raw adc to mV
                     parsedData[i] = (parsedData[i] - 0.5) * 100;    // convert to celsius
                     parsedData[i] = (parsedData[i] * 9 / 5) + 32;   // convert to fahrenheit
                 }
 
-                if ($scope.sample > $scope.sampleSize-1) {  // start shifting chart
-                    $scope.labels.push($scope.sample.toString());
+                if ($scope.sampleCnt > $scope.sampleSize-1) {  // start shifting chart
+                    $scope.labels.push($scope.sampleCnt.toString());
                     $scope.labels.shift();
-                    for (var i = 0; i < $scope.NumOfTempSensors; i++) {
+                    for (var i = 0; i < $scope.numOfTempSensors; i++) {
                         $scope.data[i].shift();
                     }
                 }
-                for (var i = 0; i < $scope.NumOfTempSensors; i++) { // pump data into chart
+                for (var i = 0; i < $scope.numOfTempSensors; i++) { // pump data to chart
                     $scope.data[i].push(parsedData[i]);
                 }
-                writer.write(parsedData);
-                $scope.sample++;    // keep track of the current sample
+                $scope.csvWriter.write(parsedData);       // pump data to csv
+                $scope.sampleCnt++;             // keep track of the current sample
 
                 // Simulate async data update
                 $timeout(function () {
@@ -71,10 +70,11 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
         });
     };
 
-    $scope.numOfSensors = function () {
+    $scope.fetchNumOfSensors = function () {
         $scope.port.write('s');
     };
 
+    /*************************************************************************************************/
     // initialize empty chart
     $scope.labels = [];
     $scope.series = [];
@@ -90,7 +90,7 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
     };
     $scope.datasetOverride = [];
     // configure chart
-    for (var i = 0; i < $scope.NumOfTempSensors; i++) { // create dataset per temp sensor
+    for (var i = 0; i < $scope.numOfTempSensors; i++) { // create dataset per temp sensor
         $scope.series.push(sprintf("Temp Sensor %d", i));
         $scope.data.push([]);
         var yAxesOpts = {
@@ -111,11 +111,7 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
             yAxesOpts.display = false;
         }
         $scope.options.scales.yAxes.push(yAxesOpts);
-        $scope.datasetOverride.push(
-            {
-                backgroundColor: "rgba(0,0,0,0)"    // remove fill from chart colors
-            }
-        );
+        $scope.datasetOverride.push({backgroundColor: "rgba(0,0,0,0)"});    // remove fill color
     }
     // renders empty chart
     for(var i = 0; i < $scope.sampleSize; i++) {
