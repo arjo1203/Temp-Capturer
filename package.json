@@ -32,6 +32,7 @@
     "csv-write-stream": "^2.0.0",
     "data-table": "^2.0.0",
     "file-system": "^2.2.2",
+    "json-parser": "^1.1.5",
     "promise": "^8.0.1",
     "serialport": "^4.0.7"
   }

@@ -1,12 +1,13 @@
 var fs = require('file-system');
 var csvWriter = require('csv-write-stream')
 var sprintf = require("sprintf-js").sprintf
+var parser = require('json-parser');
 
 TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect', function ($scope, $window, $timeout, autoDetect) {
     console.log('AppCtrl started');
 
     $scope.sampleCnt = 0;           // sample counter
-    $scope.sampleSize = 10;         // samples size for chart
+    $scope.sampleSize = 20;         // samples size for chart
     $scope.numOfTempSensors = 3;    // number of temp sensors
 
     autoDetect.then(function (result) {
@@ -21,57 +22,67 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
 
     // csv writer instantiation
     $scope.csvHeaders = [];
-    for(var i = 0; i < $scope.numOfTempSensors; i++) {
+    for (var i = 0; i < $scope.numOfTempSensors; i++) {
         $scope.csvHeaders.push(sprintf("TempSensor%d", i));
     }
-    $scope.csvWriter = csvWriter({ headers: $scope.csvHeaders});
-    $scope.csvWriter.pipe(fs.createWriteStream('out.csv'));
+    $scope.csvWriter = csvWriter({ headers: $scope.csvHeaders });
     $window.onbeforeunload = function () {
         $scope.csvWriter.end();   // close csv writer pipe
         return;
     };
 
     $scope.init = function () {
+        $scope.csvWriter.pipe(fs.createWriteStream('out.csv'));
         $scope.port.open(function (err) {
             if (err) {
                 return console.log('Error opening port: ', err.message);
             }
             console.log('Succesfully opened port!');
+            $scope.fetchNumOfSensors();
         });
         $scope.port.on('data', function (data) {
             // console.log('Data:', data);
-            var parsedData = data.replace(/(\r\n|\n|\r)/gm, "").split(','); // remove newline character, then split
-
-            if (parsedData.length > 1) {
-                for (var i = 0; i < $scope.numOfTempSensors; i++) {
-                    parsedData[i] = parsedData[i] * 5.0 / 1024;     // convert raw adc to mV
-                    parsedData[i] = (parsedData[i] - 0.5) * 100;    // convert to celsius
-                    parsedData[i] = (parsedData[i] * 9 / 5) + 32;   // convert to fahrenheit
-                }
-
-                if ($scope.sampleCnt > $scope.sampleSize-1) {  // start shifting chart
-                    $scope.labels.push($scope.sampleCnt.toString());
-                    $scope.labels.shift();
+            var parsedJson = parser.parse(data, null, true);
+            console.log(parsedJson);
+            if (parsedJson.hasOwnProperty('s')) {
+                $scope.numOfTempSensors = parsedJson.s;
+                // console.log("toggle");
+                $scope.toggleTempStream();
+            }
+            else if (parsedJson.hasOwnProperty('t')) {
+                if (parsedJson.t.length > 1) {
                     for (var i = 0; i < $scope.numOfTempSensors; i++) {
-                        $scope.data[i].shift();
+                        parsedJson.t[i] = parsedJson.t[i] * 5.0 / 1024;     // convert raw adc to mV
+                        parsedJson.t[i] = (parsedJson.t[i] - 0.5) * 100;    // convert to celsius
+                        parsedJson.t[i] = (parsedJson.t[i] * 9 / 5) + 32;   // convert to fahrenheit
                     }
-                }
-                for (var i = 0; i < $scope.numOfTempSensors; i++) { // pump data to chart
-                    $scope.data[i].push(parsedData[i]);
-                }
-                $scope.csvWriter.write(parsedData);       // pump data to csv
-                $scope.sampleCnt++;             // keep track of the current sample
+                    if ($scope.sampleCnt > $scope.sampleSize - 1) {  // start shifting chart
+                        $scope.labels.push($scope.sampleCnt.toString());
+                        $scope.labels.shift();
+                        for (var i = 0; i < $scope.numOfTempSensors; i++) {
+                            $scope.data[i].shift();
+                        }
+                    }
+                    for (var i = 0; i < $scope.numOfTempSensors; i++) { // pump data to chart
+                        $scope.data[i].push(parsedJson.t[i]);
+                    }
+                    $scope.csvWriter.write(parsedJson.t);       // pump data to csv
+                    $scope.sampleCnt++;             // keep track of the current sample
 
-                // Simulate async data update
-                $timeout(function () {
-                    $scope.updateChart();
-                }, 50);
+                    // Simulate async data update
+                    $timeout(function () {
+                        $scope.updateChart();
+                    }, 50);
+                }
             }
         });
     };
 
     $scope.fetchNumOfSensors = function () {
         $scope.port.write('s');
+    };
+    $scope.toggleTempStream = function () {
+        $scope.port.write('a');
     };
 
     /*************************************************************************************************/
@@ -111,10 +122,10 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
             yAxesOpts.display = false;
         }
         $scope.options.scales.yAxes.push(yAxesOpts);
-        $scope.datasetOverride.push({backgroundColor: "rgba(0,0,0,0)"});    // remove fill color
+        $scope.datasetOverride.push({ backgroundColor: "rgba(0,0,0,0)" });    // remove fill color
     }
     // renders empty chart
-    for(var i = 0; i < $scope.sampleSize; i++) {
+    for (var i = 0; i < $scope.sampleSize; i++) {
         $scope.labels.push(i.toString());
     }
     // console.log($scope.chartColors);
