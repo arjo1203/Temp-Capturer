@@ -1,6 +1,11 @@
-<h1>Temperature vs Sample</h1>
-<!-- <button type="button" class="btn btn-primary pull-right" ng-click="fetchNumOfSensors()">Num of Sensors</button> -->
-<button type="button" class="btn btn-primary pull-right" ng-click="toggleTempStream()">Toggle</button>
-<canvas id="line" class="chart chart-line" chart-data="data" chart-labels="labels" chart-series="series" chart-options="options"
-    chart-dataset-override="datasetOverride">
-</canvas>
+<div class="row">
+    <div class="col-lg-12">
+        <!-- <button type="button" class="btn btn-primary pull-right" ng-click="fetchNumOfSensors()">Num of Sensors</button> -->
+        <button type="button" class="btn btn-primary" ng-click="toggleStream()">Toggle</button>
+        <button type="button" class="btn btn-primary" ng-click="decreaseStreamRate()">-</button>
+        <button type="button" class="btn btn-primary" ng-click="increaseStreamRate()">+</button>
+        <canvas id="line" class="chart chart-line" chart-data="data" chart-labels="labels" chart-series="series" chart-options="options"
+            chart-dataset-override="datasetOverride">
+        </canvas>
+    </div>
+</div>

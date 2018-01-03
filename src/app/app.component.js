@@ -52,6 +52,9 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
                     $scope.updateChart();
                 }, 50);
             }
+            else if (parsedJson.hasOwnProperty('l')) {      // handle number of temperature sensors
+                console.log(parsedJson.l);
+            }
         });
     });
 
@@ -72,14 +75,20 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
         $scope.csvWriter = csvWriter({ headers: $scope.csvHeaders });
         $scope.csvWriter.pipe(fs.createWriteStream('out.csv'));
         $scope.initChart();
-        $scope.toggleTempStream();
+        $scope.toggleStream();
     };
 
     $scope.fetchNumOfSensors = function () {
         $scope.port.write('s');
     };
-    $scope.toggleTempStream = function () {
+    $scope.toggleStream = function () {
         $scope.port.write('a');
+    };
+    $scope.decreaseStreamRate = function () {
+        $scope.port.write('-');
+    };
+    $scope.increaseStreamRate = function () {
+        $scope.port.write('+');
     };
 
     /*************************************************************************************************/
@@ -93,8 +102,42 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
             legend: {
                 display: true
             },
+            title: {
+                display: true,
+                text: 'Temperature vs. Sample',
+                fontSize: 28
+            },
+            tooltips: {
+                mode: 'index',
+                intersect: false,
+            },
+            hover: {
+                mode: 'nearest',
+                intersect: true
+            },
             scales: {
-                yAxes: []
+                xAxes: [{
+                    display: true,
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Sample',
+                        fontSize: 16
+                    }
+                }],
+                yAxes: [{
+                    display: true,
+                    position: 'right',
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Fahrenheit (℉)',
+                        fontSize: 16
+                    },
+                    ticks: {
+                        max: 120,       // max range of TMP36 125 Celsius, 257 Fahrenheit
+                        min: -40,       // min range of TMP36 -40 Celsius, -40 Fahrenheit
+                        stepSize: 10    // 10 Degress Fahrenheit resolution
+                    }
+                }]
             }
         };
         $scope.datasetOverride = [];
@@ -103,24 +146,6 @@ TempCapturer.controller('AppCtrl', ['$scope', '$window', '$timeout', 'autoDetect
         for (var i = 0; i < $scope.numOfTempSensors; i++) { // create dataset per temp sensor
             $scope.series.push(sprintf("Temp Sensor %d", i));
             $scope.data.push([]);
-            var yAxesOpts = {
-                id: sprintf('y-axis-%d', i),
-                type: 'linear',
-                position: 'right',
-                ticks: {
-                    max: 120,       // max range of TMP36 125 Celsius, 257 Fahrenheit
-                    min: -40,       // min range of TMP36 -40 Celsius, -40 Fahrenheit
-                    stepSize: 10    // 10 Degress Fahrenheit resolution
-                }
-            };
-            // only show one y-axis
-            if (i == 0) {
-                yAxesOpts.display = true;
-            }
-            else {
-                yAxesOpts.display = false;
-            }
-            $scope.options.scales.yAxes.push(yAxesOpts);
             $scope.datasetOverride.push({ backgroundColor: "rgba(0,0,0,0)" });    // remove fill color
         }
         // renders empty chart
